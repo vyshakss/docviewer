@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>docviewer — sign in</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body class="auth-page">
+  <main class="auth-card">
+    <h1>docviewer</h1>
+
+    <form id="password-form">
+      <label>Username <input type="text" name="username" autocomplete="username" required /></label>
+      <label>Password <input type="password" name="password" autocomplete="current-password" required /></label>
+      <button type="submit">Continue</button>
+      <p class="error" id="password-error"></p>
+    </form>
+
+    <form id="totp-form" hidden>
+      <label>Authenticator code <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required /></label>
+      <button type="submit">Sign in</button>
+      <p class="error" id="totp-error"></p>
+    </form>
+  </main>
+  <script src="/static/login.js"></script>
+</body>
+</html>

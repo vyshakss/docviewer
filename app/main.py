@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Depends, FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,12 +9,18 @@ from app.auth.dependencies import get_current_user
 from app.auth.routes import router as auth_router
 from app.config import get_settings
 from app.files.routes import router as files_router
+from app.net import client_ip
 from app.preview.routes import router as preview_router
+from app.system.routes import router as system_router
+
+logging.basicConfig(level=logging.INFO)
+access_logger = logging.getLogger("docviewer.access")
 
 app = FastAPI(title="docviewer", docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(auth_router)
 app.include_router(files_router)
 app.include_router(preview_router)
+app.include_router(system_router)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
@@ -51,6 +59,10 @@ async def security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Content-Security-Policy"] = "default-src 'self'"
     response.headers["Cache-Control"] = "no-store"
+
+    access_logger.info(
+        "%s %s %s %s", client_ip(request), request.method, request.url.path, response.status_code
+    )
     return response
 
 

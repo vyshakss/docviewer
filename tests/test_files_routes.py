@@ -211,6 +211,64 @@ def test_upload_long_filename_does_not_500(tmp_path, monkeypatch):
         assert list(settings.files_root.iterdir()) == []
 
 
+def test_mkdir_creates_directory(tmp_path, monkeypatch):
+    client, settings = _authed_client(tmp_path, monkeypatch)
+
+    resp = client.post(
+        "/api/mkdir",
+        json={"path": "", "name": "new_folder"},
+        headers={"X-CSRF-Token": client.cookies["csrf_token"]},
+    )
+    assert resp.status_code == 200
+    assert (settings.files_root / "new_folder").is_dir()
+
+
+def test_mkdir_requires_csrf(tmp_path, monkeypatch):
+    client, settings = _authed_client(tmp_path, monkeypatch)
+
+    resp = client.post(
+        "/api/mkdir",
+        json={"path": "", "name": "new_folder"},
+    )
+    assert resp.status_code == 403
+    assert not (settings.files_root / "new_folder").exists()
+
+
+def test_mkdir_rejects_traversal_name(tmp_path, monkeypatch):
+    client, settings = _authed_client(tmp_path, monkeypatch)
+
+    resp = client.post(
+        "/api/mkdir",
+        json={"path": "", "name": "../escape"},
+        headers={"X-CSRF-Token": client.cookies["csrf_token"]},
+    )
+    assert resp.status_code == 400
+    assert not (settings.files_root.parent / "escape").exists()
+
+
+def test_mkdir_rejects_existing_target(tmp_path, monkeypatch):
+    client, settings = _authed_client(tmp_path, monkeypatch)
+    (settings.files_root / "existing").mkdir()
+
+    resp = client.post(
+        "/api/mkdir",
+        json={"path": "", "name": "existing"},
+        headers={"X-CSRF-Token": client.cookies["csrf_token"]},
+    )
+    assert resp.status_code == 409
+
+
+def test_mkdir_rejects_invalid_parent_path(tmp_path, monkeypatch):
+    client, _settings = _authed_client(tmp_path, monkeypatch)
+
+    resp = client.post(
+        "/api/mkdir",
+        json={"path": "../../etc", "name": "new_folder"},
+        headers={"X-CSRF-Token": client.cookies["csrf_token"]},
+    )
+    assert resp.status_code == 400
+
+
 def test_rename_file(tmp_path, monkeypatch):
     client, settings = _authed_client(tmp_path, monkeypatch)
     (settings.files_root / "old.txt").write_text("data")
@@ -479,3 +537,76 @@ def test_move_rejects_root_as_dest(tmp_path, monkeypatch):
     )
     assert resp.status_code == 400
     assert (settings.files_root / "a.txt").exists()
+
+
+# --- folder upload contract -------------------------------------------------
+# The folder-upload client (app.js) builds a directory tree by calling
+# /api/mkdir once per level, then uploads each file with the relative
+# subdirectory in the `path` query parameter. These lock in the exact
+# endpoint behaviour that client relies on.
+
+
+def test_mkdir_creates_directory_inside_existing_subdirectory(tmp_path, monkeypatch):
+    client, settings = _authed_client(tmp_path, monkeypatch)
+    (settings.files_root / "parent").mkdir()
+
+    resp = client.post(
+        "/api/mkdir",
+        json={"path": "parent", "name": "child"},
+        headers={"X-CSRF-Token": client.cookies["csrf_token"]},
+    )
+    assert resp.status_code == 200
+    assert (settings.files_root / "parent" / "child").is_dir()
+
+
+def test_mkdir_rejects_multi_segment_name(tmp_path, monkeypatch):
+    # The client must create each level with its own call; it cannot smuggle a
+    # whole relative path through `name`.
+    client, settings = _authed_client(tmp_path, monkeypatch)
+
+    resp = client.post(
+        "/api/mkdir",
+        json={"path": "", "name": "parent/child"},
+        headers={"X-CSRF-Token": client.cookies["csrf_token"]},
+    )
+    assert resp.status_code == 400
+    assert not (settings.files_root / "parent").exists()
+
+
+def test_mkdir_missing_parent_is_not_created_implicitly(tmp_path, monkeypatch):
+    # mkdir() is non-recursive, so the client must walk levels shallowest-first.
+    client, settings = _authed_client(tmp_path, monkeypatch)
+
+    resp = client.post(
+        "/api/mkdir",
+        json={"path": "absent", "name": "child"},
+        headers={"X-CSRF-Token": client.cookies["csrf_token"]},
+    )
+    assert resp.status_code == 404
+    assert not (settings.files_root / "absent").exists()
+
+
+def test_upload_into_nested_subdirectory(tmp_path, monkeypatch):
+    client, settings = _authed_client(tmp_path, monkeypatch)
+    (settings.files_root / "parent" / "child").mkdir(parents=True)
+
+    resp = client.post(
+        "/api/upload",
+        params={"path": "parent/child"},
+        files={"file": ("leaf.txt", b"nested content", "text/plain")},
+        headers={"X-CSRF-Token": client.cookies["csrf_token"]},
+    )
+    assert resp.status_code == 200
+    assert (settings.files_root / "parent" / "child" / "leaf.txt").read_bytes() == b"nested content"
+
+
+def test_upload_into_missing_subdirectory_returns_404(tmp_path, monkeypatch):
+    client, _settings = _authed_client(tmp_path, monkeypatch)
+
+    resp = client.post(
+        "/api/upload",
+        params={"path": "not_created_yet"},
+        files={"file": ("leaf.txt", b"content", "text/plain")},
+        headers={"X-CSRF-Token": client.cookies["csrf_token"]},
+    )
+    assert resp.status_code == 404

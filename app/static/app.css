@@ -1,13 +1,148 @@
 * { box-sizing: border-box; }
-body { font-family: system-ui, sans-serif; margin: 0; background: #0f1115; color: #e6e6e6; }
+
+:root {
+  color-scheme: dark;
+  --bg: #0f1115;
+  --surface: #1a1d24;
+  --border: #2a2d36;
+  --text: #e6e6e6;
+  --text-muted: #9aa0ac;
+  --accent: #8ab4f8;
+  --danger: #ff6b6b;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --border: #dde1e8;
+    --text: #1c1e21;
+    --text-muted: #5b6270;
+    --accent: #1a56db;
+    --danger: #d9363e;
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --border: #dde1e8;
+  --text: #1c1e21;
+  --text-muted: #5b6270;
+  --accent: #1a56db;
+  --danger: #d9363e;
+}
+
+body { font-family: system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
 .auth-page { display: flex; align-items: center; justify-content: center; height: 100vh; }
-.auth-card { background: #1a1d24; padding: 2rem; border-radius: 8px; width: 320px; }
+.auth-card { background: var(--surface); padding: 2rem; border-radius: 8px; width: 320px; }
 .auth-card label { display: block; margin-bottom: 1rem; }
 .auth-card input { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
-.error { color: #ff6b6b; min-height: 1.2em; }
-header { display: flex; align-items: center; gap: 1rem; padding: 1rem; border-bottom: 1px solid #2a2d36; }
-#breadcrumbs a { color: #8ab4f8; text-decoration: none; margin-right: 0.25rem; }
-table { width: 100%; border-collapse: collapse; margin: 1rem; }
-th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #2a2d36; }
-tr.entry:hover { background: #1a1d24; cursor: pointer; }
-.actions button { margin-right: 0.5rem; }
+.error { color: var(--danger); min-height: 1.2em; }
+
+header { display: flex; align-items: center; gap: 1rem; padding: 1rem; border-bottom: 1px solid var(--border); }
+#breadcrumbs a { color: var(--accent); text-decoration: none; margin-right: 0.25rem; }
+#theme-toggle { font-size: 1.1rem; line-height: 1; padding: 0.4rem 0.6rem; }
+#search-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  width: 200px;
+}
+
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 1rem;
+}
+/* The class sets display:flex, which would otherwise beat the UA stylesheet's
+   rule for the `hidden` attribute and leave the bar permanently visible. */
+.upload-progress[hidden] { display: none; }
+.upload-progress-track {
+  flex: 1;
+  height: 3px;
+  background: var(--border);
+}
+.upload-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.15s ease;
+}
+.upload-progress-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+body.drag-active { outline: 2px dashed var(--accent); outline-offset: -6px; }
+
+@keyframes flash-highlight {
+  from { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+  to { background: transparent; }
+}
+tr.entry.just-uploaded {
+  animation: flash-highlight 2s ease-out;
+}
+
+#stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; padding: 1rem; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.stat-value { font-size: 1.25rem; font-weight: 600; }
+.stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 1rem; }
+th, td { text-align: left; padding: 0.7rem 0.75rem; border-bottom: 1px solid var(--border); }
+th.menu-col, td.menu-col { width: 2.5rem; padding-left: 0; padding-right: 0.5rem; }
+tr.entry { cursor: pointer; }
+tr.entry:hover, tr.entry.menu-open { background: var(--surface); }
+tr.entry:hover td:first-child, tr.entry.menu-open td:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+tr.entry:hover td:last-child, tr.entry.menu-open td:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+.entry-icon { margin-right: 0.4rem; }
+
+.row-menu-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+tr.entry:hover .row-menu-btn,
+tr.entry:focus-within .row-menu-btn,
+tr.entry.menu-open .row-menu-btn {
+  opacity: 1;
+}
+.row-menu-btn:hover { background: var(--bg); color: var(--text); }
+
+.context-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  padding: 0.3rem;
+}
+.context-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.context-menu button:hover { background: var(--bg); }
+.context-menu button[data-action="delete"] { color: var(--danger); }

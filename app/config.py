@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 2_147_483_648
     login_lockout_threshold: int = 5
     login_lockout_window_seconds: int = 900
+    cookie_secure: bool = True
 
     class Config:
         env_file = ".env"

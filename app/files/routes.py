@@ -24,6 +24,11 @@ class MoveBody(BaseModel):
     dest: str
 
 
+class MkdirBody(BaseModel):
+    path: str
+    name: str
+
+
 @router.get("/files")
 def list_files(path: str = "", user=Depends(get_current_user)):
     settings = get_settings()
@@ -116,6 +121,41 @@ async def upload_file(
         raise HTTPException(status_code=400, detail="Invalid filename or upload failed")
 
     return {"ok": True, "name": filename, "size": total}
+
+
+@router.post("/mkdir")
+def mkdir(
+    body: MkdirBody,
+    user=Depends(get_current_user),
+    _csrf=Depends(require_csrf),
+):
+    settings = get_settings()
+
+    # Same sanitization as rename/upload: `name` becomes a path segment via
+    # `parent / name` below, so it must reduce to its own basename with
+    # nothing stripped (catches separators, absolute paths, "."/"..").
+    raw_name = body.name
+    name = Path(raw_name).name
+    if not name or name in (".", "..") or name != raw_name:
+        raise HTTPException(status_code=400, detail="Invalid folder name")
+
+    try:
+        parent = resolve_safe_path(settings.files_root, body.path)
+    except UnsafePathError:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    if not parent.exists() or not parent.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    target = parent / name
+    if target.exists():
+        raise HTTPException(status_code=409, detail="Target already exists")
+
+    try:
+        target.mkdir()
+    except (OSError, ValueError):
+        raise HTTPException(status_code=400, detail="Operation failed")
+    return {"ok": True, "name": name}
 
 
 @router.post("/rename")

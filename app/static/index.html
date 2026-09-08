@@ -9,15 +9,48 @@
   <header>
     <strong>docviewer</strong>
     <nav id="breadcrumbs"></nav>
+    <input type="search" id="search-input" placeholder="Search this folder…" aria-label="Search this folder" />
     <span style="flex: 1"></span>
+    <button id="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode"></button>
+    <button id="new-folder-button">New Folder</button>
     <input type="file" id="upload-input" hidden />
     <button id="upload-button">Upload</button>
+    <input type="file" id="upload-folder-input" webkitdirectory directory hidden />
+    <button id="upload-folder-button">Upload Folder</button>
     <button id="logout-button">Log out</button>
   </header>
+  <div id="upload-progress" class="upload-progress" hidden>
+    <div class="upload-progress-track">
+      <div id="upload-progress-bar" class="upload-progress-bar"></div>
+    </div>
+    <span id="upload-progress-label" class="upload-progress-label"></span>
+  </div>
+  <div id="stat-cards">
+    <div class="stat-card">
+      <span class="stat-value" id="stat-time">--:--:--</span>
+      <span class="stat-label">Time</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value" id="stat-cpu-temp">--</span>
+      <span class="stat-label">CPU Temp</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value" id="stat-uptime">--</span>
+      <span class="stat-label">Uptime</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value" id="stat-storage">--</span>
+      <span class="stat-label">Storage</span>
+    </div>
+  </div>
   <table>
-    <thead><tr><th>Name</th><th>Size</th><th>Modified</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Name</th><th>Size</th><th>Modified</th><th class="menu-col"></th></tr></thead>
     <tbody id="entries"></tbody>
   </table>
+  <div id="context-menu" class="context-menu" role="menu" hidden>
+    <button type="button" data-action="rename" role="menuitem">Rename</button>
+    <button type="button" data-action="delete" role="menuitem">Delete</button>
+  </div>
   <script src="/static/app.js"></script>
 </body>
 </html>

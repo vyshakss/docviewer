@@ -6,6 +6,7 @@ from app.auth import models
 from app.auth.dependencies import get_current_user, require_csrf
 from app.auth.security import verify_password, verify_totp
 from app.config import get_settings
+from app.net import client_ip as _client_ip
 
 router = APIRouter()
 
@@ -17,10 +18,6 @@ class LoginBody(BaseModel):
 
 class VerifyBody(BaseModel):
     code: str
-
-
-def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
 
 
 @router.post("/login")
@@ -46,7 +43,7 @@ def login(body: LoginBody, request: Request, response: Response):
         pending_token,
         max_age=settings.pending_login_ttl_seconds,
         httponly=True,
-        secure=True,
+        secure=settings.cookie_secure,
         samesite="strict",
     )
     return {"requires_totp": True}
@@ -88,7 +85,7 @@ def login_verify(body: VerifyBody, request: Request, response: Response):
         session_token,
         max_age=settings.session_ttl_seconds,
         httponly=True,
-        secure=True,
+        secure=settings.cookie_secure,
         samesite="strict",
     )
     response.set_cookie(
@@ -96,7 +93,7 @@ def login_verify(body: VerifyBody, request: Request, response: Response):
         csrf_token,
         max_age=settings.session_ttl_seconds,
         httponly=False,
-        secure=True,
+        secure=settings.cookie_secure,
         samesite="strict",
     )
     return {"ok": True}

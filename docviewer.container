@@ -4,7 +4,7 @@ After=network-online.target
 
 [Container]
 Image=localhost/docviewer:local
-PublishPort=127.0.0.1:8000:8000
+PublishPort=0.0.0.0:8000:8000
 UserNS=keep-id:uid=1000,gid=1000
 Volume=%h/docviewer-data/files:/data/files:z
 Volume=%h/docviewer-data/state:/data/db:U,Z

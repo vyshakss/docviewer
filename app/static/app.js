@@ -289,7 +289,7 @@ function joinPath(base, rel) {
   return `${base}/${rel}`;
 }
 
-function uploadFile(file, path, onProgress) {
+function uploadFile(file, path, name, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api/upload?path=${encodeURIComponent(path)}`);
@@ -310,7 +310,10 @@ function uploadFile(file, path, onProgress) {
     xhr.onerror = () => reject(new Error("Upload failed"));
 
     const formData = new FormData();
-    formData.append("file", file);
+    // Explicit filename: some browsers (Safari) set File.name to a full
+    // relative path for directory-picked files instead of just the
+    // basename, which the server rejects outright.
+    formData.append("file", file, name);
     xhr.send(formData);
   });
 }
@@ -325,12 +328,19 @@ function uploadFile(file, path, onProgress) {
 
 // Files picked via <input webkitdirectory> carry their subpath in
 // webkitRelativePath ("folder/sub/a.txt"); everything before the last "/" is
-// the directory that file belongs in.
+// the directory that file belongs in, and everything after is the real
+// filename. Safari sets File.name to the *whole* relative path for these
+// (Chrome/Firefox use just the basename), so `name` must always be derived
+// from webkitRelativePath here rather than trusted from file.name.
 function entriesFromFileList(fileList) {
   return Array.from(fileList).map((file) => {
     const rel = file.webkitRelativePath || "";
     const cut = rel.lastIndexOf("/");
-    return { file, relDir: cut === -1 ? "" : rel.slice(0, cut) };
+    return {
+      file,
+      relDir: cut === -1 ? "" : rel.slice(0, cut),
+      name: cut === -1 ? file.name : rel.slice(cut + 1),
+    };
   });
 }
 
@@ -351,7 +361,9 @@ function readAllEntries(reader) {
 async function walkEntry(entry, parentDir, out) {
   if (entry.isFile) {
     const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
-    out.push({ file, relDir: parentDir });
+    // entry.name is the FileSystemEntry's own name, reliable across browsers
+    // unlike File.name (which Safari sets to the full relative path here).
+    out.push({ file, relDir: parentDir, name: entry.name });
     return;
   }
   const dir = joinPath(parentDir, entry.name);
@@ -368,7 +380,7 @@ async function entriesFromDataTransfer(dataTransfer) {
     .filter((item) => item.kind === "file")
     .map((item) => (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null))
     .filter(Boolean);
-  const flat = Array.from(dataTransfer.files || []).map((file) => ({ file, relDir: "" }));
+  const flat = Array.from(dataTransfer.files || []).map((file) => ({ file, relDir: "", name: file.name }));
   if (!roots.length) return flat;
 
   const out = [];
@@ -427,14 +439,14 @@ async function uploadEntries(entries, basePath) {
       }
     }
 
-    for (const { file, relDir } of entries) {
-      const label = joinPath(relDir, file.name);
+    for (const { file, relDir, name } of entries) {
+      const label = joinPath(relDir, name);
       if (relDir && failedDirs.has(relDir)) {
         // Its directory never got created, so the upload could only 404.
         failures.push(`${label}: skipped, folder missing`);
       } else {
         try {
-          await uploadFile(file, joinPath(basePath, relDir), (loaded) => {
+          await uploadFile(file, joinPath(basePath, relDir), name, (loaded) => {
             if (totalBytes) {
               setUploadProgress((doneBytes + loaded) / totalBytes, `${done}/${entries.length}`);
             }
@@ -463,7 +475,7 @@ async function runUpload(entries) {
   // Highlight the top-level thing that arrived: the folder for a tree, the
   // file itself for a plain upload.
   const first = entries[0];
-  const highlight = first.relDir ? first.relDir.split("/")[0] : first.file.name;
+  const highlight = first.relDir ? first.relDir.split("/")[0] : first.name;
   await loadEntries(basePath, highlight);
 
   if (failures.length) {
@@ -474,7 +486,7 @@ async function runUpload(entries) {
 }
 
 document.getElementById("upload-input").onchange = async (event) => {
-  const entries = Array.from(event.target.files).map((file) => ({ file, relDir: "" }));
+  const entries = Array.from(event.target.files).map((file) => ({ file, relDir: "", name: file.name }));
   event.target.value = "";
   await runUpload(entries);
 };
